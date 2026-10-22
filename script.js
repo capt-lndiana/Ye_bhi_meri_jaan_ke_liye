@@ -72,7 +72,10 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const signature = document.getElementById('signature');
             if (signature) {
-                signature.textContent = CONFIG.messages.signature;
+                const base = CONFIG.messages.signature || 'With all my love';
+                signature.textContent = CONFIG.yourName && !base.includes(CONFIG.yourName)
+                    ? `${base}, ${CONFIG.yourName} 💕`
+                    : base;
             }
         }
     }
@@ -83,6 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create floating hearts
     function createHearts() {
         const heartsContainer = document.querySelector('.hearts-container');
+        if (!heartsContainer) return;
         const heartSymbols = ['💕', '💖', '💗', '💘', '💝', '💞', '💟', '💌', '💋', '❤️'];
         
         for (let i = 0; i < 15; i++) {
@@ -97,47 +101,106 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Music Control
+    // Music Permission Modal & Control
+    const musicModalOverlay = document.getElementById('musicModalOverlay');
+    const musicModalYes = document.getElementById('musicModalYes');
+    const musicModalNo = document.getElementById('musicModalNo');
     const musicToggle = document.getElementById('musicToggle');
     const bgMusic = document.getElementById('bgMusic');
     let isPlaying = false;
 
-    musicToggle.addEventListener('click', function() {
-        if (isPlaying) {
-            bgMusic.pause();
-            musicToggle.textContent = '🎵';
-            isPlaying = false;
-        } else {
-            bgMusic.play().then(() => {
-                musicToggle.textContent = '🔊';
+    function playMusic() {
+        if (!bgMusic) return;
+        const playPromise = bgMusic.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
                 isPlaying = true;
-            }).catch(() => {
-                musicToggle.textContent = '❌';
-                console.log('Music could not be played');
+                if (musicToggle) {
+                    musicToggle.textContent = '🔊';
+                    musicToggle.setAttribute('aria-label', 'Pause background music');
+                    musicToggle.setAttribute('aria-pressed', 'true');
+                }
+            }).catch(err => {
+                console.warn('Playback error:', err);
+                if (musicToggle) {
+                    musicToggle.textContent = '🎵';
+                    musicToggle.setAttribute('aria-label', 'Play background music');
+                    musicToggle.setAttribute('aria-pressed', 'false');
+                }
+                isPlaying = false;
             });
         }
-    });
+    }
+
+    function pauseMusic() {
+        if (!bgMusic) return;
+        bgMusic.pause();
+        isPlaying = false;
+        if (musicToggle) {
+            musicToggle.textContent = '🎵';
+            musicToggle.setAttribute('aria-label', 'Play background music');
+            musicToggle.setAttribute('aria-pressed', 'false');
+        }
+    }
+
+    function closeMusicModal() {
+        if (musicModalOverlay) {
+            musicModalOverlay.classList.add('fade-out');
+            setTimeout(() => {
+                musicModalOverlay.style.display = 'none';
+            }, 300);
+        }
+    }
+
+    // Modal Events
+    if (musicModalYes) {
+        musicModalYes.addEventListener('click', function() {
+            closeMusicModal();
+            playMusic();
+        });
+    }
+
+    if (musicModalNo) {
+        musicModalNo.addEventListener('click', function() {
+            closeMusicModal();
+            pauseMusic();
+        });
+    }
+
+    // Toggle button in header
+    if (musicToggle) {
+        musicToggle.addEventListener('click', function() {
+            if (isPlaying) {
+                pauseMusic();
+            } else {
+                playMusic();
+            }
+        });
+    }
 
     // Love Note Toggle
     const loveButton = document.getElementById('loveButton');
     const loveNote = document.getElementById('loveNote');
 
-    loveButton.addEventListener('click', function() {
-        loveNote.classList.toggle('visible');
-        if (loveNote.classList.contains('visible')) {
-            loveButton.textContent = 'Hide My Love Note 💝';
-            createHeartBurst();
-        } else {
-            loveButton.textContent = 'Click for a surprise 💝';
-        }
-    });
+    if (loveButton && loveNote) {
+        loveButton.addEventListener('click', function() {
+            loveNote.classList.toggle('visible');
+            if (loveNote.classList.contains('visible')) {
+                loveButton.textContent = 'Hide My Love Note 💝';
+                createHeartBurst();
+            } else {
+                loveButton.textContent = 'Click for a surprise 💝';
+            }
+        });
+    }
 
     // Create heart burst effect
     function createHeartBurst() {
         const heartsContainer = document.querySelector('.hearts-container');
+        if (!heartsContainer) return;
         const burstHearts = ['💕', '💖', '💗', '💘', '💝', '💞'];
         
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 12; i++) {
             const heart = document.createElement('div');
             heart.className = 'heart';
             heart.textContent = burstHearts[Math.floor(Math.random() * burstHearts.length)];
@@ -154,31 +217,47 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Grand celebration for milestone 1000
+    function createGrandCelebration() {
+        createHeartBurst();
+        setTimeout(createHeartBurst, 300);
+        setTimeout(createHeartBurst, 600);
+        setTimeout(createHeartRain, 200);
+        setTimeout(createSparkles, 400);
+    }
+
     // Kiss Counter
     let kissCount = 0;
     const kissButton = document.getElementById('kissButton');
     const kissCountDisplay = document.getElementById('kissCount');
+    const kissMilestoneBanner = document.getElementById('kissMilestoneBanner');
+    let specialMessageTimer = null;
 
-    kissButton.addEventListener('click', function() {
-        kissCount++;
-        kissCountDisplay.textContent = kissCount;
-        createKissEffect();
-        
-        // Add special messages for certain kiss counts
-        if (window.CONFIG && window.CONFIG.kissMessages) {
-            if (kissCount === 10 && window.CONFIG.kissMessages[10]) {
-                showSpecialMessage(window.CONFIG.kissMessages[10]);
-            } else if (kissCount === 50 && window.CONFIG.kissMessages[50]) {
-                showSpecialMessage(window.CONFIG.kissMessages[50]);
-            } else if (kissCount === 100 && window.CONFIG.kissMessages[100]) {
-                showSpecialMessage(window.CONFIG.kissMessages[100]);
+    if (kissButton && kissCountDisplay) {
+        kissButton.addEventListener('click', function() {
+            kissCount++;
+            kissCountDisplay.textContent = kissCount;
+            createKissEffect();
+            
+            // Check milestone: every 10 kisses up to 1000
+            if (kissCount % 10 === 0 && kissCount <= 1000) {
+                let msg = '';
+                if (window.CONFIG && window.CONFIG.kissMessages && window.CONFIG.kissMessages[kissCount]) {
+                    msg = window.CONFIG.kissMessages[kissCount];
+                }
+                if (msg) {
+                    showSpecialMessage(msg, kissCount);
+                }
+            } else if (kissCount > 1000 && kissCount % 50 === 0) {
+                showSpecialMessage(`Infinite Kisses: ${kissCount} kisses! My love for you goes beyond all numbers! ♾️💖`, kissCount);
             }
-        }
-    });
+        });
+    }
 
     // Create kiss effect
     function createKissEffect() {
         const kissEffects = document.querySelector('.kiss-effects');
+        if (!kissEffects) return;
         const kissSymbols = ['💋', '💕', '💖', '💗', '😘'];
         
         for (let i = 0; i < 5; i++) {
@@ -199,29 +278,64 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Show special message
-    function showSpecialMessage(message) {
+    // Show special message popup and persistent banner
+    function showSpecialMessage(message, count) {
+        // Update banner under button
+        if (kissMilestoneBanner) {
+            kissMilestoneBanner.textContent = message;
+            kissMilestoneBanner.classList.remove('active');
+            void kissMilestoneBanner.offsetWidth; // force reflow
+            kissMilestoneBanner.classList.add('active');
+        }
+
+        // Remove any existing floating popup
+        const existingPopup = document.querySelector('.kiss-milestone-popup');
+        if (existingPopup) {
+            existingPopup.remove();
+        }
+        if (specialMessageTimer) {
+            clearTimeout(specialMessageTimer);
+        }
+
         const messageDiv = document.createElement('div');
-        messageDiv.textContent = message;
-        messageDiv.style.position = 'fixed';
-        messageDiv.style.top = '50%';
-        messageDiv.style.left = '50%';
-        messageDiv.style.transform = 'translate(-50%, -50%)';
-        messageDiv.style.background = 'linear-gradient(135deg, #FF69B4, #FF1493)';
-        messageDiv.style.color = 'white';
-        messageDiv.style.padding = '1rem 2rem';
-        messageDiv.style.borderRadius = '2rem';
-        messageDiv.style.fontFamily = 'Great Vibes, cursive';
-        messageDiv.style.fontSize = '1.5rem';
-        messageDiv.style.fontWeight = '600';
-        messageDiv.style.boxShadow = '0 10px 30px rgba(255, 105, 180, 0.4)';
-        messageDiv.style.zIndex = '10000';
-        messageDiv.style.animation = 'glow 2s ease-in-out infinite alternate';
+        messageDiv.className = 'kiss-milestone-popup' + (count === 1000 ? ' kiss-milestone-1000' : '');
+        messageDiv.setAttribute('role', 'alert');
+        messageDiv.setAttribute('aria-live', 'assertive');
+
+        const tagText = count ? `💋 Milestone #${count}` : '💕 A Sweet Note';
+        messageDiv.innerHTML = `
+            <div class="kiss-popup-content">
+                <span class="kiss-popup-tag">${tagText}</span>
+                <p class="kiss-popup-text">${message}</p>
+            </div>
+        `;
+
+        // Click to dismiss
+        messageDiv.addEventListener('click', function() {
+            messageDiv.classList.add('closing');
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 250);
+        });
+
         document.body.appendChild(messageDiv);
-        
-        setTimeout(() => {
-            messageDiv.remove();
-        }, 3000);
+
+        // Special animations for major milestones
+        if (count === 1000) {
+            createGrandCelebration();
+        } else if (count && count % 100 === 0) {
+            createHeartBurst();
+        }
+
+        // Auto dismiss after 4 seconds
+        specialMessageTimer = setTimeout(() => {
+            if (messageDiv.parentElement) {
+                messageDiv.classList.add('closing');
+                setTimeout(() => {
+                    messageDiv.remove();
+                }, 250);
+            }
+        }, 4000);
     }
 
     // Memory Gallery Interactions
@@ -261,6 +375,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create starry night effect
     function createStars() {
         const heartsContainer = document.querySelector('.hearts-container');
+        if (!heartsContainer) return;
         
         for (let i = 0; i < 20; i++) {
             const star = document.createElement('div');
@@ -283,6 +398,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create sparkle effect
     function createSparkles() {
         const heartsContainer = document.querySelector('.hearts-container');
+        if (!heartsContainer) return;
         const sparkles = ['✨', '⭐', '💫', '🌟'];
         
         for (let i = 0; i < 15; i++) {
@@ -305,6 +421,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create heart rain effect
     function createHeartRain() {
         const heartsContainer = document.querySelector('.hearts-container');
+        if (!heartsContainer) return;
         const hearts = ['💕', '💖', '💗', '💘', '💝', '💞'];
         
         for (let i = 0; i < 25; i++) {
@@ -326,9 +443,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Add rain animation
-    const style = document.createElement('style');
-    style.textContent = `
+    // Add rain animation style
+    const rainStyle = document.createElement('style');
+    rainStyle.textContent = `
         @keyframes rainDown {
             to {
                 transform: translateY(calc(100vh + 50px));
@@ -336,7 +453,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     `;
-    document.head.appendChild(style);
+    document.head.appendChild(rainStyle);
 
     // Show memory message
     function showMemoryMessage(message) {
@@ -347,7 +464,7 @@ document.addEventListener('DOMContentLoaded', function() {
         messageDiv.style.left = '50%';
         messageDiv.style.transform = 'translate(-50%, -50%)';
         messageDiv.style.background = 'rgba(255, 255, 255, 0.95)';
-        messageDiv.style.color = '#FF1493';
+        messageDiv.style.color = '#7A1238';
         messageDiv.style.padding = '1.5rem 2rem';
         messageDiv.style.borderRadius = '1rem';
         messageDiv.style.fontFamily = 'Cormorant Garamond, serif';
@@ -398,7 +515,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add some initial animations
     setTimeout(() => {
-        document.querySelector('.main-title').style.animation = 'glow 2s ease-in-out infinite alternate';
+        const mainTitle = document.querySelector('.main-title');
+        if (mainTitle) {
+            mainTitle.style.animation = 'glow 2s ease-in-out infinite alternate';
+        }
     }, 1000);
 
     // Auto-create some floating hearts periodically
@@ -413,12 +533,13 @@ document.addEventListener('DOMContentLoaded', function() {
         section.style.scrollMarginTop = '2rem';
     });
 
-    // Add loading animation
-    window.addEventListener('load', function() {
-        document.body.style.opacity = '0';
-        document.body.style.transition = 'opacity 0.5s ease';
-        setTimeout(() => {
-            document.body.style.opacity = '1';
-        }, 100);
+    [partnerCharacter, youCharacter].forEach(el => {
+        if (!el) return;
+        el.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                el.click();
+            }
+        });
     });
 });
